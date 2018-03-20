@@ -31,7 +31,8 @@ class DataSupplierMLP(snt.AbstractModule):
             cols += ['days_delta_{}'.format(w + 1),
                      'age_{}'.format(w + 1),
                      'shop_id_{}'.format(w + 1), # shop_idを識別子のままでいいのかあとで要検討
-                     'item_num_{}'.format(w + 1)]
+                     'item_num_{}'.format(w + 1),
+                    'list_price_sum_{}'.format(w + 1)]
         cols += ['gender', 'pref_cd']
 
         # ここで何を入力（ノード）にするかを決めている
@@ -43,14 +44,14 @@ class DataSupplierMLP(snt.AbstractModule):
 
     def _build(self, indices):
         # たくさんあるデータのうちindicesだけとってきて集めてリストを返す
-        batch_x = [tf.gather(xi, indices, name='x_gather') for xi in self._x]
-        batch_t = tf.gather(self._t, indices, name='t_gather')
+        batch_x = [tf.gather(xi, indices, name='make_x_batch') for xi in self._x] # data11, data32, data24, ...みたいな
+        batch_t = tf.gather(self._t, indices, name='make_t_bath') # 010111010101100みたいな
 
         return batch_x, batch_t
 
     @staticmethod
     def loss(logits, target, output_size):
-        with tf.name_scope('soft_max_CE'):
+        with tf.name_scope('softmax_w/_CrossEntropy'):
             one_hot_target = tf.one_hot(tf.to_int32(target, name='to_int32_one_hot'),
                                         depth=output_size, dtype=tf.float32)
             v = tf.losses.softmax_cross_entropy(one_hot_target, logits)
@@ -62,7 +63,7 @@ class DataSupplierMLP(snt.AbstractModule):
         ops = [] # accuracy, precision, recall の update_ops
 
         # tf.argmaxで最も確からしいラベルを返す
-        prediction = tf.argmax(logits, 1, name='argumax_y')
+        prediction = tf.argmax(logits, 1, name='argmax_y')
 
         e, o = tf.metrics.accuracy(target, prediction)
         evals.append(e)

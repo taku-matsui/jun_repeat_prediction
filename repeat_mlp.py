@@ -15,6 +15,8 @@ class RepeatMLP(snt.AbstractModule):
         self._layers = constants.layers
         self._window = constants.n_window
         
+        self._n_input = None
+        
         self._hash_shop_id = None
         self._hash_gender = None
         self._hash_pref_cd = None
@@ -45,20 +47,20 @@ class RepeatMLP(snt.AbstractModule):
         # 出力：入力に活性化関数ReLUをかけた後の値
         
         with tf.name_scope('unit_feature_{}_ago'.format(times)):
-            day, age, shop_id, item = x
-            # 識別子IDでないもの
-            day_age_item = tf.concat([tf.expand_dims(day, 1, name='expand_days'),
-                                     tf.expand_dims(age, 1, name='expand_age'),
-                                     tf.expand_dims(item, 1, name='expand_item')], axis=1)
+            day, age, shop_id, item, price = x # 入力は t ごと. 例えば、x = [d1, age1, shop_id1, item_num1]
+            # 識別子IDでないもの. 1ユーザーあたり、day_age_item = ayyar( [ day, age, item] )が並ぶだけ
+            day_age_item_price = tf.concat([tf.expand_dims(day, 1, name='expand_days'),
+                                     tf.expand_dims(age, 1, name='expand_age'), # 一次元ふやす（ [2. 3] -> [ [2], [3]] ）
+                                     tf.expand_dims(item, 1, name='expand_item'),
+                                     tf.expand_dims(price, 1, name='expand_price')], axis=1)
             # 識別子のもの
-            idx_shop_id = self._hash_shop_id.lookup(shop_id)
-            
+            idx_shop_id = self._hash_shop_id.lookup(shop_id)        
             # 活性化関数（ReLU）をかける
             h_shop_id = tf.nn.relu(self._emb_shop_id(idx_shop_id))
             
             # 全ての入力データを連結
-            h = tf.concat([h_shop_id, day_age_item], axis=1)
-            
+            h = tf.concat([h_shop_id, day_age_item_price], axis=1)
+            #self._n_input = h.shape[1]
             return h
     def _build(self, x, is_train=False):
         # x = [ d1, age1, shop_id1, item_num1,
@@ -67,14 +69,15 @@ class RepeatMLP(snt.AbstractModule):
         #       gender,
         #       pref_cd
         #     ]
-        
+        self._n_input = 5
         idx_gender = self._hash_gender.lookup(x[-2]) # ここに関しては不明？？？？？
         h_gender = tf.one_hot(idx_gender, depth=len(self._gender_labels), dtype=tf.float32, name="gender_one_hot")
         
         idx_pref_cd = self._hash_pref_cd.lookup(x[-1])
         h_pref_cd = tf.one_hot(idx_pref_cd, depth=len(self._pref_cd_labels), dtype=tf.float32, name="pref_cd_one_hot")
         
-        hs = [self._get_unit_feature(x[w * 4: (w + 1) * 4], w + 1) for w in range(self._window)] + [h_gender] + [h_pref_cd]
+        # リスト型：hs = [ 't = 1', 't = 2', 't = 3', h_gender, h_pref_cd ]
+        hs = [self._get_unit_feature(x[w * self._n_input: (w + 1) * self._n_input], w + 1) for w in range(self._window)] + [h_gender] + [h_pref_cd]
         
         # gender, pref_cd以外に活性化関数をかけたEmbed + gender (one-hot) + pref_cd (one-hot)
         h = tf.concat(hs, axis=1)

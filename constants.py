@@ -9,10 +9,14 @@ class Consts(object):
         const = ConfigParser()
         const.read(path)
 
+        # DB info
+        #self.db_config = dict(const.items('db'))
+
         # data info
         self.data_path = const.get('data', 'data_path') # data_path = haruyama_repeat_predict_data.csv
         self.n_window = ast.literal_eval(const.get('data', 'n_window')) # n_window = 5
         self.split_date = const.get('data', 'split_date') # split_date = 2017-11-19
+        self.valid_latest_date = const.get('data', 'valid_latest_date')
 
         # train info
         self.batch_size = ast.literal_eval(const.get('train', 'batch_size')) # batch_size = 10000
